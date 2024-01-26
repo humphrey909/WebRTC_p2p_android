@@ -84,11 +84,16 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
         }
     }
 
+    //소켓 리스너 생성
     fun Socket_Listener(){
         mSocket?.on(Socket.EVENT_CONNECT, onConnect)
 //        mSocket?.on("test", test)
 
-        mSocket?.on("all_users", all_users)
+        mSocket?.on("enter", enter)
+        mSocket?.on("create", create)
+
+
+//        mSocket?.on("all_users", all_users)
         mSocket?.on("getOffer", getOffer)
         mSocket?.on("getAnswer", getAnswer)
         mSocket?.on("getCandidate", getCandidate)
@@ -115,13 +120,42 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
 //            e.printStackTrace()
 //        }
 //    }
+    private val enter = Emitter.Listener { args ->
+        val message = args[0] as String
 
+        Log.d("enter", "getCandidate")
+//        Log.d("test", Arrays.toString(args)) // [org.webrtc.SessionDescription@15f3281]
+        Log.d("enter", message) // org.webrtc.SessionDescription@15f3281
+        Log.d("enter", "getCandidate")
 
-    private val all_users = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
-        // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.
-        //            mSocket.emit("login", username);
-        Log.d("Tag", "Socket is connected with ")
+        var commend = "enter"
+        try {
+            messageInterface.onNewMessage(commend, gson.fromJson(args[0].toString(),MessageModel::class.java))
+        }catch (e:Exception){
+            e.printStackTrace()
+        }
     }
+    private val create = Emitter.Listener { args ->
+        val message = args[0] as String
+
+        Log.d("create", "getCandidate")
+//        Log.d("test", Arrays.toString(args)) // [org.webrtc.SessionDescription@15f3281]
+        Log.d("create", message) // org.webrtc.SessionDescription@15f3281
+        Log.d("create", "getCandidate")
+
+        var commend = "create"
+        try {
+            messageInterface.onNewMessage(commend, gson.fromJson(args[0].toString(),MessageModel::class.java))
+        }catch (e:Exception){
+            e.printStackTrace()
+        }
+    }
+
+//    private val all_users = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
+//        // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.
+//        //            mSocket.emit("login", username);
+//        Log.d("Tag", "Socket is connected with ")
+//    }
 
     private val getOffer = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
         // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.

@@ -103,7 +103,7 @@ class RTCClient(
     }
 
     //상대방이 전화를 받았고 offer 전송 시작
-    fun call(target: String) {
+    fun call(room: String) {
         val mediaConstraints = MediaConstraints()
         mediaConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
 
@@ -124,7 +124,7 @@ class RTCClient(
                         socketRepository.sendMessageToSocket(
                             "create_offer",
                             MessageModel(
-                                 username, target, offer
+                                 username, room, offer
                             )
                         )
                     }

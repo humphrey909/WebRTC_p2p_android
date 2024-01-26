@@ -26,7 +26,8 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
     private var socketRepository:SocketRepository?=null
     private var rtcClient : RTCClient?=null
     private val TAG = "CallActivity"
-    private var target:String = "" //??
+    //    private var target:String = "" //??
+    private var room:String = "" //??
     private val gson = Gson()
     private var isMute = false
     private var isCameraPause = false
@@ -61,7 +62,7 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                 //rtcClient에 추적이 잡히는 ice가 있다면 전송
                 socketRepository?.sendMessageToSocket(
                     "ice_candidate",
-                    MessageModel(userName,target,candidate)
+                    MessageModel(userName,room,candidate)
                 )
 
             }
@@ -80,14 +81,14 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
         binding.apply {
 
             //who to call? 에서 전화 걸기 버튼
-            callBtn.setOnClickListener {
-                socketRepository?.sendMessageToSocket(
-                    "start_call",
-                    MessageModel(
-                    userName,targetUserNameEt.text.toString(),null
-                ))
-                target = targetUserNameEt.text.toString()
-            }
+//            callBtn.setOnClickListener {
+//                socketRepository?.sendMessageToSocket(
+//                    "start_call",
+//                    MessageModel(
+//                    userName,targetUserNameEt.text.toString(),null
+//                ))
+////                target = targetUserNameEt.text.toString()
+//            }
 
             switchCameraButton.setOnClickListener {
                 rtcClient?.switchCamera()
@@ -156,7 +157,41 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
     //websocket 메시지 오면 받는 부분
     override fun onNewMessage(commend:String,message: MessageModel) {
         Log.d(TAG, "onNewMessage: $message")
-//        when(message.commend){
+
+
+        when(commend){
+            //방 생성
+            "create"->{
+                Log.d(TAG, "create!!!!")
+                Log.d(TAG, "create: ${message.userid}")
+                Log.d(TAG, "create: ${message.room}")
+
+                room = message.room.toString() //룸 지정
+            }
+
+            //기존에 있던 방 입장
+            "enter"->{
+                Log.d(TAG, "enter!!!!")
+                Log.d(TAG, "enter: ${message.userid}")
+                Log.d(TAG, "enter: ${message.room}")
+
+                room = message.room.toString() //룸 지정
+
+                runOnUiThread {
+                    setWhoToCallLayoutGone() //기존화면 off
+                    setCallLayoutVisible() //전화 화면 on
+
+                    //기능 연결
+                    binding.apply {
+                        rtcClient?.initializeSurfaceView(localView)
+                        rtcClient?.initializeSurfaceView(remoteView)
+                        rtcClient?.startLocalVideo(localView)
+
+                        //sdp offer 시작하는 부분 - 전화를 받은 사람이 먼저 offer 보냄
+                        rtcClient?.call(room)
+                    }
+                }
+            }
 //
 //            //전화 왔다고 알려주는 부분
 //            "call_response"->{
@@ -246,7 +281,7 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
 //                    e.printStackTrace()
 //                }
 //            }
-//        }
+        }
     }
 
     private fun setIncomingCallLayoutGone(){
