@@ -23,6 +23,7 @@ class MainActivity : AppCompatActivity() {
                 ).request{ allGranted, _ ,_ ->
                     if (allGranted){
                         startActivity(
+                            //숫자만 입력해서 user idx를 넘겨주는 식으로 진행하겠음.
                             Intent(this,CallActivity::class.java)
                                 .putExtra("username",binding.username.text.toString())
                         )

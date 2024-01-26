@@ -1,10 +1,10 @@
 package com.codewithkael.webrtcprojectforrecord
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import com.codewithkael.webrtcprojectforrecord.databinding.ActivityCallBinding
 import com.codewithkael.webrtcprojectforrecord.models.IceCandidateModel
 import com.codewithkael.webrtcprojectforrecord.models.MessageModel
@@ -12,6 +12,8 @@ import com.codewithkael.webrtcprojectforrecord.utils.NewMessageInterface
 import com.codewithkael.webrtcprojectforrecord.utils.PeerConnectionObserver
 import com.codewithkael.webrtcprojectforrecord.utils.RTCAudioManager
 import com.google.gson.Gson
+import io.socket.client.Socket
+import io.socket.emitter.Emitter
 import org.webrtc.IceCandidate
 import org.webrtc.MediaStream
 import org.webrtc.SessionDescription
@@ -24,7 +26,7 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
     private var socketRepository:SocketRepository?=null
     private var rtcClient : RTCClient?=null
     private val TAG = "CallActivity"
-    private var target:String = ""
+    private var target:String = "" //??
     private val gson = Gson()
     private var isMute = false
     private var isCameraPause = false
@@ -38,13 +40,14 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
         setContentView(binding.root)
         init()
 
+        createSocket() //소켓 리스너 부분
 
     }
 
     private fun init(){
         userName = intent.getStringExtra("username")
         socketRepository = SocketRepository(this)
-        userName?.let { socketRepository?.initSocket(it) }
+        userName?.let { socketRepository?.initSocket(it) } //소켓 연결
         rtcClient = RTCClient(application,userName!!,socketRepository!!, object : PeerConnectionObserver() {
             override fun onIceCandidate(p0: IceCandidate?) {
                 super.onIceCandidate(p0)
@@ -55,8 +58,10 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                     "sdpCandidate" to p0?.sdp
                 )
 
+                //rtcClient에 추적이 잡히는 ice가 있다면 전송
                 socketRepository?.sendMessageToSocket(
-                    MessageModel("ice_candidate",userName,target,candidate)
+                    "ice_candidate",
+                    MessageModel(userName,target,candidate)
                 )
 
             }
@@ -71,10 +76,15 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
         rtcAudioManager.setDefaultAudioDevice(RTCAudioManager.AudioDevice.SPEAKER_PHONE)
 
 
+        //버튼 기능 바인딩하는 부분
         binding.apply {
+
+            //who to call? 에서 전화 걸기 버튼
             callBtn.setOnClickListener {
-                socketRepository?.sendMessageToSocket(MessageModel(
-                    "start_call",userName,targetUserNameEt.text.toString(),null
+                socketRepository?.sendMessageToSocket(
+                    "start_call",
+                    MessageModel(
+                    userName,targetUserNameEt.text.toString(),null
                 ))
                 target = targetUserNameEt.text.toString()
             }
@@ -125,91 +135,118 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                 rtcClient?.endCall()
             }
         }
-
     }
 
-    override fun onNewMessage(message: MessageModel) {
+
+    private fun createSocket() {
+//        socketRepository?.Socket_Listener()
+//        socketRepository?.mSocket?.on(Socket.EVENT_CONNECT, onConnect)
+
+//        mSocket.on(Socket.EVENT_CONNECT, onConnect)
+//        mSocket.on("all_users", all_users)
+//        mSocket.on("getOffer", getOffer)
+//        mSocket.on("getAnswer", getAnswer)
+//        mSocket.on("getCandidate", getCandidate)
+    }
+
+
+
+
+
+    //websocket 메시지 오면 받는 부분
+    override fun onNewMessage(commend:String,message: MessageModel) {
         Log.d(TAG, "onNewMessage: $message")
-        when(message.type){
-            "call_response"->{
-                if (message.data == "user is not online"){
-                    //user is not reachable
-                    runOnUiThread {
-                        Toast.makeText(this,"user is not reachable",Toast.LENGTH_LONG).show()
-
-                    }
-                }else{
-                    //we are ready for call, we started a call
-                    runOnUiThread {
-                        setWhoToCallLayoutGone()
-                        setCallLayoutVisible()
-                        binding.apply {
-                            rtcClient?.initializeSurfaceView(localView)
-                            rtcClient?.initializeSurfaceView(remoteView)
-                            rtcClient?.startLocalVideo(localView)
-                            rtcClient?.call(targetUserNameEt.text.toString())
-                        }
-
-
-                    }
-
-                }
-            }
-            "answer_received" ->{
-
-                val session = SessionDescription(
-                    SessionDescription.Type.ANSWER,
-                    message.data.toString()
-                )
-                rtcClient?.onRemoteSessionReceived(session)
-                runOnUiThread {
-                    binding.remoteViewLoading.visibility = View.GONE
-                }
-            }
-            "offer_received" ->{
-                runOnUiThread {
-                    setIncomingCallLayoutVisible()
-                    binding.incomingNameTV.text = "${message.name.toString()} is calling you"
-                    binding.acceptButton.setOnClickListener {
-                        setIncomingCallLayoutGone()
-                        setCallLayoutVisible()
-                        setWhoToCallLayoutGone()
-
-                        binding.apply {
-                            rtcClient?.initializeSurfaceView(localView)
-                            rtcClient?.initializeSurfaceView(remoteView)
-                            rtcClient?.startLocalVideo(localView)
-                        }
-                        val session = SessionDescription(
-                            SessionDescription.Type.OFFER,
-                            message.data.toString()
-                        )
-                        rtcClient?.onRemoteSessionReceived(session)
-                        rtcClient?.answer(message.name!!)
-                        target = message.name!!
-                        binding.remoteViewLoading.visibility = View.GONE
-
-                    }
-                    binding.rejectButton.setOnClickListener {
-                        setIncomingCallLayoutGone()
-                    }
-
-                }
-
-            }
-
-
-            "ice_candidate"->{
-                try {
-                    val receivingCandidate = gson.fromJson(gson.toJson(message.data),
-                        IceCandidateModel::class.java)
-                    rtcClient?.addIceCandidate(IceCandidate(receivingCandidate.sdpMid,
-                        Math.toIntExact(receivingCandidate.sdpMLineIndex.toLong()),receivingCandidate.sdpCandidate))
-                }catch (e:Exception){
-                    e.printStackTrace()
-                }
-            }
-        }
+//        when(message.commend){
+//
+//            //전화 왔다고 알려주는 부분
+//            "call_response"->{
+//                if (message.data == "user is not online"){ //유저가 없는 경우
+//                    //user is not reachable
+//                    runOnUiThread {
+//                        Toast.makeText(this,"user is not reachable",Toast.LENGTH_LONG).show()
+//
+//                    }
+//                }else{ //전화 알람이 간 경우
+//                    //we are ready for call, we started a call
+//                    runOnUiThread {
+//                        setWhoToCallLayoutGone() //기존화면 off
+//                        setCallLayoutVisible() //전화 화면 on
+//
+//                        //기능 연결
+//                        binding.apply {
+//                            rtcClient?.initializeSurfaceView(localView)
+//                            rtcClient?.initializeSurfaceView(remoteView)
+//                            rtcClient?.startLocalVideo(localView)
+//
+//                            //sdp offer 시작하는 부분 - 전화를 받은 사람이 먼저 offer 보냄
+//                            rtcClient?.call(targetUserNameEt.text.toString())
+//                        }
+//                    }
+//                }
+//            }
+//
+//            //전화 건사람이 answer 받음
+//            "answer_received" ->{
+//
+//                val session = SessionDescription(
+//                    SessionDescription.Type.ANSWER,
+//                    message.data.toString()
+//                )
+//                rtcClient?.onRemoteSessionReceived(session)
+//                runOnUiThread {
+//                    binding.remoteViewLoading.visibility = View.GONE
+//                }
+//            }
+//
+//            //전화 건 사람이 offer 받음
+//            "offer_received" ->{
+//                runOnUiThread {
+//                    setIncomingCallLayoutVisible()
+//                    binding.incomingNameTV.text = "${message.userid.toString()} is calling you"
+//                    binding.acceptButton.setOnClickListener {
+//                        setIncomingCallLayoutGone()
+//                        setCallLayoutVisible()
+//                        setWhoToCallLayoutGone()
+//
+//                        binding.apply {
+//                            rtcClient?.initializeSurfaceView(localView)
+//                            rtcClient?.initializeSurfaceView(remoteView)
+//                            rtcClient?.startLocalVideo(localView)
+//                        }
+//                        val session = SessionDescription(
+//                            SessionDescription.Type.OFFER,
+//                            message.data.toString()
+//                        )
+//                        rtcClient?.onRemoteSessionReceived(session)
+//
+//                        //전화 받은 사람에게 answer 전송
+//                        rtcClient?.answer(message.userid!!)
+//                        target = message.userid!!
+//                        binding.remoteViewLoading.visibility = View.GONE
+//
+//                    }
+//                    binding.rejectButton.setOnClickListener {
+//                        setIncomingCallLayoutGone()
+//                    }
+//
+//                }
+//
+//            }
+//
+//            //전송된 ice_candidate를 상대방에게 전송하여 서로 주고 받음
+//            "ice_candidate"->{
+//                try {
+//                    val receivingCandidate = gson.fromJson(gson.toJson(message.data),
+//                        IceCandidateModel::class.java)
+//
+//                    //ice_candidate 저장
+//                    rtcClient?.addIceCandidate(IceCandidate(receivingCandidate.sdpMid,
+//                        Math.toIntExact(receivingCandidate.sdpMLineIndex.toLong()),receivingCandidate.sdpCandidate))
+//                }catch (e:Exception){
+//                    e.printStackTrace()
+//                }
+//            }
+//        }
     }
 
     private fun setIncomingCallLayoutGone(){
