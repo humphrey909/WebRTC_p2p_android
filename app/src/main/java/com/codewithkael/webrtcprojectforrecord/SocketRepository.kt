@@ -15,7 +15,7 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
     private var userName: String? = null
     private val TAG = "SocketRepository"
     private val gson = Gson()
-    var mSocket: Socket? = null
+    private var mSocket: Socket? = null
 
     fun initSocket(username: String) {
         userName = username
@@ -91,12 +91,15 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
 
         mSocket?.on("enter", enter)
         mSocket?.on("create", create)
+        mSocket?.on("delete_user", delete_user)
+
+
 
 
 //        mSocket?.on("all_users", all_users)
-        mSocket?.on("getOffer", getOffer)
-        mSocket?.on("getAnswer", getAnswer)
-        mSocket?.on("getCandidate", getCandidate)
+        mSocket?.on("offer_received", offer_received)
+        mSocket?.on("answer_received", answer_received)
+        mSocket?.on("ice_candidate", ice_candidate)
     }
     private val onConnect = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
         // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.
@@ -123,10 +126,9 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
     private val enter = Emitter.Listener { args ->
         val message = args[0] as String
 
-        Log.d("enter", "getCandidate")
-//        Log.d("test", Arrays.toString(args)) // [org.webrtc.SessionDescription@15f3281]
+        Log.d("enter", "enter")
         Log.d("enter", message) // org.webrtc.SessionDescription@15f3281
-        Log.d("enter", "getCandidate")
+        Log.d("enter", "enter")
 
         var commend = "enter"
         try {
@@ -138,10 +140,9 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
     private val create = Emitter.Listener { args ->
         val message = args[0] as String
 
-        Log.d("create", "getCandidate")
-//        Log.d("test", Arrays.toString(args)) // [org.webrtc.SessionDescription@15f3281]
+        Log.d("create", "create")
         Log.d("create", message) // org.webrtc.SessionDescription@15f3281
-        Log.d("create", "getCandidate")
+        Log.d("create", "create")
 
         var commend = "create"
         try {
@@ -151,27 +152,68 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
         }
     }
 
-//    private val all_users = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
-//        // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.
-//        //            mSocket.emit("login", username);
-//        Log.d("Tag", "Socket is connected with ")
-//    }
+    private val delete_user = Emitter.Listener { args ->
+        val message = args[0] as String
 
-    private val getOffer = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
-        // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.
-        //            mSocket.emit("login", username);
-        Log.d("Tag", "Socket is connected with ")
+        Log.d("delete_user", "delete_user")
+        Log.d("delete_user", message) // org.webrtc.SessionDescription@15f3281
+        Log.d("delete_user", "delete_user")
+
+        var commend = "delete_user"
+        try {
+            messageInterface.onNewMessage(commend, gson.fromJson(args[0].toString(),MessageModel::class.java))
+        }catch (e:Exception){
+            e.printStackTrace()
+        }
     }
 
-    private val getAnswer = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
-        // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.
-        //            mSocket.emit("login", username);
-        Log.d("Tag", "Socket is connected with ")
+
+    private val offer_received = Emitter.Listener { args ->
+        val message = args[0] as String
+
+        Log.d("offer_received", "offer_received")
+        Log.d("offer_received", message) // org.webrtc.SessionDescription@15f3281
+        Log.d("offer_received", "offer_received")
+
+        var commend = "offer_received"
+        try {
+            messageInterface.onNewMessage(commend, gson.fromJson(args[0].toString(),MessageModel::class.java))
+        }catch (e:Exception){
+            e.printStackTrace()
+        }
+    }
+    private val answer_received = Emitter.Listener { args ->
+        val message = args[0] as String
+
+        Log.d("answer_received", "answer_received")
+        Log.d("answer_received", message) // org.webrtc.SessionDescription@15f3281
+        Log.d("answer_received", "answer_received")
+
+        var commend = "answer_received"
+        try {
+            messageInterface.onNewMessage(commend, gson.fromJson(args[0].toString(),MessageModel::class.java))
+        }catch (e:Exception){
+            e.printStackTrace()
+        }
     }
 
-    private val getCandidate = Emitter.Listener { // 여기서 다시 "login" 이벤트를 서버쪽으로 username과 함께 보냅니다.
-        // 서버 측에서는 이 username을 whoIsON Array에 추가를 할 것입니다.
-        //            mSocket.emit("login", username);
-        Log.d("Tag", "Socket is connected with ")
+    private val ice_candidate = Emitter.Listener { args ->
+        val message = args[0] as String
+
+        Log.d("ice_candidate", "ice_candidate")
+        Log.d("ice_candidate", message) // org.webrtc.SessionDescription@15f3281
+        Log.d("ice_candidate", "ice_candidate")
+
+        var commend = "ice_candidate"
+        try {
+            messageInterface.onNewMessage(commend, gson.fromJson(args[0].toString(),MessageModel::class.java))
+        }catch (e:Exception){
+            e.printStackTrace()
+        }
+    }
+
+
+    fun Socket_Close(){
+        mSocket?.disconnect()
     }
 }

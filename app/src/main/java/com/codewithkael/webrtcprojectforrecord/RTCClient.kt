@@ -23,7 +23,6 @@ class RTCClient(
         PeerConnection.IceServer("turn:openrelay.metered.ca:80","openrelayproject","openrelayproject"),
         PeerConnection.IceServer("turn:openrelay.metered.ca:443","openrelayproject","openrelayproject"),
         PeerConnection.IceServer("turn:openrelay.metered.ca:443?transport=tcp","openrelayproject","openrelayproject"),
-
         )
     private val peerConnection by lazy { createPeerConnection(observer) }
     private val localVideoSource by lazy { peerConnectionFactory.createVideoSource(false) }
@@ -166,10 +165,9 @@ class RTCClient(
             }
 
         }, session)
-
     }
 
-    fun answer(target: String) {
+    fun answer(room: String) {
         val constraints = MediaConstraints()
         constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
 
@@ -188,7 +186,7 @@ class RTCClient(
                         socketRepository.sendMessageToSocket(
                             "create_answer",
                             MessageModel(
-                                username, target, answer
+                                username, room, answer
                             )
                         )
                     }

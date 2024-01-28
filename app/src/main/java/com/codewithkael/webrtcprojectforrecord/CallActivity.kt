@@ -40,15 +40,14 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
         binding = ActivityCallBinding.inflate(layoutInflater)
         setContentView(binding.root)
         init()
-
-        createSocket() //소켓 리스너 부분
-
     }
 
     private fun init(){
         userName = intent.getStringExtra("username")
         socketRepository = SocketRepository(this)
         userName?.let { socketRepository?.initSocket(it) } //소켓 연결
+
+        //rtc 연결
         rtcClient = RTCClient(application,userName!!,socketRepository!!, object : PeerConnectionObserver() {
             override fun onIceCandidate(p0: IceCandidate?) {
                 super.onIceCandidate(p0)
@@ -79,6 +78,7 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
 
         //버튼 기능 바인딩하는 부분
         binding.apply {
+            binding.localName.text = userName //자신 id 지정
 
             //who to call? 에서 전화 걸기 버튼
 //            callBtn.setOnClickListener {
@@ -131,25 +131,16 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
             }
             endCallButton.setOnClickListener {
                 setCallLayoutGone()
-                setWhoToCallLayoutVisible()
-                setIncomingCallLayoutGone()
+//                setWhoToCallLayoutVisible()
+//                setIncomingCallLayoutGone()
                 rtcClient?.endCall()
+
+                socketRepository?.Socket_Close()
+
+                finish();
             }
         }
     }
-
-
-    private fun createSocket() {
-//        socketRepository?.Socket_Listener()
-//        socketRepository?.mSocket?.on(Socket.EVENT_CONNECT, onConnect)
-
-//        mSocket.on(Socket.EVENT_CONNECT, onConnect)
-//        mSocket.on("all_users", all_users)
-//        mSocket.on("getOffer", getOffer)
-//        mSocket.on("getAnswer", getAnswer)
-//        mSocket.on("getCandidate", getCandidate)
-    }
-
 
 
 
@@ -167,6 +158,20 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                 Log.d(TAG, "create: ${message.room}")
 
                 room = message.room.toString() //룸 지정
+
+
+
+                runOnUiThread {
+//                    setWhoToCallLayoutGone() //기존화면 off
+                    setCallLayoutVisible() //전화 화면 on
+
+                    //기능 연결
+                    binding.apply {
+                        rtcClient?.initializeSurfaceView(localView)
+                        rtcClient?.initializeSurfaceView(remoteView)
+                        rtcClient?.startLocalVideo(localView)
+                    }
+                }
             }
 
             //기존에 있던 방 입장
@@ -178,7 +183,7 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                 room = message.room.toString() //룸 지정
 
                 runOnUiThread {
-                    setWhoToCallLayoutGone() //기존화면 off
+//                    setWhoToCallLayoutGone() //기존화면 off
                     setCallLayoutVisible() //전화 화면 on
 
                     //기능 연결
@@ -189,9 +194,89 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
 
                         //sdp offer 시작하는 부분 - 전화를 받은 사람이 먼저 offer 보냄
                         rtcClient?.call(room)
+
                     }
                 }
             }
+
+            //상대 회원이 나갔을때
+            "delete_user"->{
+                Log.d(TAG, "delete_user!!!!")
+                Log.d(TAG, "delete_user: ${message.userid}")
+                Log.d(TAG, "delete_user: ${message.room}")
+                Log.d(TAG, "delete_user: ${message.data}")
+
+                //리모트 회원에 대해 초기화 시키기.
+
+                runOnUiThread {
+                    binding.remoteViewLoading.visibility = View.VISIBLE
+                    binding.remoteName.text = "회원 나감" //리모트 id 지정
+                }
+            }
+
+            //offer 받음
+            "offer_received"->{
+                Log.d(TAG, "offer_received!!!!")
+                Log.d(TAG, "offer_received: ${message.userid}")
+                Log.d(TAG, "offer_received: ${message.room}")
+
+                runOnUiThread {
+                    val session = SessionDescription(
+                        SessionDescription.Type.OFFER,
+                        message.data.toString()
+                    )
+                    rtcClient?.onRemoteSessionReceived(session)
+
+                    //전화 받은 사람에게 answer 전송
+                    rtcClient?.answer(message.room!!)
+                    room = message.room!!
+
+                    //로딩 아이콘 안보이게
+                    binding.remoteViewLoading.visibility = View.GONE
+//                    binding.remoteName.text = message.userid //리모트 id 지정
+                }
+            }
+
+
+            "answer_received"->{
+                Log.d(TAG, "answer_received!!!!")
+                Log.d(TAG, "answer_received: ${message.userid}")
+                Log.d(TAG, "answer_received: ${message.room}")
+
+                val session = SessionDescription(
+                    SessionDescription.Type.ANSWER,
+                    message.data.toString()
+                )
+                rtcClient?.onRemoteSessionReceived(session)
+                runOnUiThread {
+                    binding.remoteViewLoading.visibility = View.GONE
+
+//                    binding.remoteName.text = message.userid //리모트 id 지정
+                }
+            }
+
+            "ice_candidate"->{
+                Log.d(TAG, "ice_candidate!!!!")
+                Log.d(TAG, "ice_candidate: ${message.userid}")
+                Log.d(TAG, "ice_candidate: ${message.room}")
+
+
+                try {
+                    val receivingCandidate = gson.fromJson(gson.toJson(message.data),
+                        IceCandidateModel::class.java)
+
+                    //ice_candidate 저장
+                    rtcClient?.addIceCandidate(IceCandidate(receivingCandidate.sdpMid,
+                        Math.toIntExact(receivingCandidate.sdpMLineIndex.toLong()),receivingCandidate.sdpCandidate))
+                }catch (e:Exception){
+                    e.printStackTrace()
+                }
+
+                runOnUiThread {
+                    binding.remoteName.text = message.userid //리모트 id 지정
+                }
+            }
+
 //
 //            //전화 왔다고 알려주는 부분
 //            "call_response"->{
@@ -284,12 +369,12 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
         }
     }
 
-    private fun setIncomingCallLayoutGone(){
-        binding.incomingCallLayout.visibility = View.GONE
-    }
-    private fun setIncomingCallLayoutVisible() {
-        binding.incomingCallLayout.visibility = View.VISIBLE
-    }
+//    private fun setIncomingCallLayoutGone(){
+//        binding.incomingCallLayout.visibility = View.GONE
+//    }
+//    private fun setIncomingCallLayoutVisible() {
+//        binding.incomingCallLayout.visibility = View.VISIBLE
+//    }
 
     private fun setCallLayoutGone() {
         binding.callLayout.visibility = View.GONE
@@ -299,11 +384,11 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
         binding.callLayout.visibility = View.VISIBLE
     }
 
-    private fun setWhoToCallLayoutGone() {
-        binding.whoToCallLayout.visibility = View.GONE
-    }
-
-    private fun setWhoToCallLayoutVisible() {
-        binding.whoToCallLayout.visibility = View.VISIBLE
-    }
+//    private fun setWhoToCallLayoutGone() {
+//        binding.whoToCallLayout.visibility = View.GONE
+//    }
+//
+//    private fun setWhoToCallLayoutVisible() {
+//        binding.whoToCallLayout.visibility = View.VISIBLE
+//    }
 }
