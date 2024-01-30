@@ -58,7 +58,7 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
 
         //IO.socket 메소드는 은 저 URL 을 토대로 클라이언트 객체를 Return 합니다.
         try {
-            mSocket = IO.socket("http://13.209.75.236:3000")
+            mSocket = IO.socket("http://52.78.172.145:3003")
             mSocket?.connect()
 
 
